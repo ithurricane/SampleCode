@@ -7,7 +7,7 @@ Auto click links to get Rakuten Points™ .
 ## Installation
 1. Requires python2.6+.
 2. If you don't have pip. Intsall pip.
-3.Setup selenium:
+3. Setup selenium:
     in command type in :pip install selenium
 4. Selenium requires a driver to interface with the chosen browser.
     Firefox, requires geckodriver, which needs to be installed before the below examples can be run.
@@ -47,16 +47,6 @@ def check_exists_by_xpath(elm, xpath):
     except NoSuchElementException:
         return False
     return True
-
-# driver.get("http://www.baidu.com")
-# size=driver.find_element_by_id('kw').size
-# print size
-#
-# text=driver.find_element_by_id("cp").text
-# print text
-#
-# above =driver.find_element_by_id("kw")
-# ActionChains(driver).move_to_element(above).perform()
 
 driver.get(click_url)
 loginid = driver.find_element_by_id('u')
