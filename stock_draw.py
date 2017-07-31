@@ -4,10 +4,7 @@
 #***********************************************************************************
 """
 Sample :
-python stock_draw.py 600028.ss cn D:\Dev\stockdb\ipagp.ttf
-python stock_draw.py 002050.sz cn D:\Dev\stockdb\ipagp.ttf
-python stock_draw.py 6734 jp D:\Dev\stockdb\ipagp.ttf
-python stock_draw.py AAPL us D:\Dev\stockdb\ipagp.ttf
+python stock_draw.py 6734 D:\Dev\stockdb\ipagp.ttf
 """
 #twitter : @ithurricanept
 #***********************************************************************************
@@ -16,7 +13,7 @@ from __future__ import unicode_literals
 import time, os, sys, datetime
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter, WeekdayLocator, MonthLocator, DayLocator, MONDAY
-from matplotlib.finance import quotes_historical_yahoo_ochl, candlestick2_ochl, volume_overlay
+from matplotlib.finance import candlestick2_ochl, volume_overlay
 from matplotlib import gridspec
 from matplotlib.dates import num2date, IndexDateFormatter
 from matplotlib.ticker import  IndexLocator, FuncFormatter
@@ -28,7 +25,71 @@ import numpy as np
 from pandas import Series, DataFrame
 from urllib2 import urlopen
 import urllib2
-import pandas.io.data as web
+#import pandas.io.data as web
+import pandas_datareader._utils as web
+from pykdb.core import Stocks, KDBError
+from datetime import datetime
+import time
+import matplotlib.dates as mdates
+
+
+#MACD, MACD Signal and MACD difference
+def MACD(df, n_fast, n_slow):
+    #EMAfast = pd.Series(pd.ewma(df['Close'], span = n_fast, min_periods = n_slow - 1))
+    EMAfast = pd.Series(df['Close']).ewm(ignore_na=False, span=n_fast, min_periods=n_slow - 1, adjust=True).mean()
+    #EMAslow = pd.Series(pd.ewma(df['Close'], span = n_slow, min_periods = n_slow - 1))
+    EMAslow = pd.Series(df['Close']).ewm(ignore_na=False, span=n_slow, min_periods=n_slow - 1, adjust=True).mean()
+    MACD = pd.Series(EMAfast - EMAslow, name = 'MACD_' + str(n_fast) + '_' + str(n_slow))
+    #MACDsign = pd.Series(pd.ewma(MACD, span = 9, min_periods = 8), name = 'MACDsign_' + str(n_fast) + '_' + str(n_slow))
+    MACDsign = pd.Series(MACD, name='MACDsign_' + str(n_fast) + '_' + str(n_slow)).ewm(ignore_na=False, span=9, min_periods=8, adjust=True).mean()
+    MACDdiff = pd.Series(MACD - MACDsign, name = 'MACDdiff_' + str(n_fast) + '_' + str(n_slow))
+    df = df.join(MACD)
+    df = df.join(MACDsign)
+    df = df.join(MACDdiff)
+    return df
+
+#Relative Strength Index
+def RSI(df, n):
+    i = 0
+    UpI = [0]
+    DoI = [0]
+    while i + 1 <= df.index[-1]:
+        UpMove = df.get_value(i + 1, 'High') - df.get_value(i, 'High')
+        DoMove = df.get_value(i, 'Low') - df.get_value(i + 1, 'Low')
+        if UpMove > DoMove and UpMove > 0:
+            UpD = UpMove
+        else: UpD = 0
+        UpI.append(UpD)
+        if DoMove > UpMove and DoMove > 0:
+            DoD = DoMove
+        else: DoD = 0
+        DoI.append(DoD)
+        i = i + 1
+    UpI = pd.Series(UpI)
+    DoI = pd.Series(DoI)
+    #PosDI = pd.Series(pd.ewma(UpI, span = n, min_periods = n - 1))
+    PosDI = pd.Series(UpI).ewm(adjust=True,ignore_na=False,min_periods=n-1,span=n).mean()
+    #NegDI = pd.Series(pd.ewma(DoI, span = n, min_periods = n - 1))
+    NegDI = pd.Series(DoI).ewm(adjust=True, ignore_na=False, min_periods=n-1, span=n).mean()
+    RSI = pd.Series(PosDI / (PosDI + NegDI), name = 'RSI_' + str(n))
+    df = df.join(RSI)
+    return df
+
+#True Strength Index
+def TSI(df, r, s):
+    M = pd.Series(df['Close'].diff(1))
+    aM = abs(M)
+    #EMA1 = pd.Series(pd.ewma(M, span = r, min_periods = r - 1))
+    EMA1 = pd.Series(M).ewm(adjust=True,ignore_na=False,min_periods=r-1,span=r).mean()
+    #aEMA1 = pd.Series(pd.ewma(aM, span = r, min_periods = r - 1))
+    aEMA1 = pd.Series(aM).ewm(adjust=True,ignore_na=False,min_periods=r-1,span=r).mean()
+    #EMA2 = pd.Series(pd.ewma(EMA1, span = s, min_periods = s - 1))
+    EMA2 = pd.Series(EMA1).ewm(adjust=True,ignore_na=False,min_periods=s-1,span=s).mean()
+    #aEMA2 = pd.Series(pd.ewma(aEMA1, span = s, min_periods = s - 1))
+    aEMA2 = pd.Series(aEMA1).ewm(adjust=True,ignore_na=False,min_periods=s-1,span=s).mean()
+    TSI = pd.Series(EMA2 / aEMA2, name = 'TSI_' + str(r) + '_' + str(s))
+    df = df.join(TSI)
+    return df
 
 def get_quote_yahoojp(code, start=None, end=None, interval='d'):
     base = 'http://info.finance.yahoo.co.jp/history/?code={0}.T&{1}&{2}&tm={3}&p={4}'
@@ -54,8 +115,9 @@ def get_quote_yahoojp(code, start=None, end=None, interval='d'):
         result['Date'] = pd.to_datetime(result['Date'], format='%Y年%m月')
     else:
         result['Date'] = pd.to_datetime(result['Date'], format='%Y年%m月%d日')
-    result = result.set_index('Date')
-    result = result.sort_index()
+    #result = result.set_index('Date')
+    #result = result.sort_index()
+    result = result.sort_values(by=['Date'])
     return result
 
 def get_stock_name(code, contry):
@@ -153,26 +215,36 @@ def moving_average_convergence(x, nslow=26, nfast=12):
 if __name__ == '__main__':
     print sys.argv[:]
 
-    if len(sys.argv) < 4 :
+    if len(sys.argv) < 3 :
         print "Usage : python stock_draw.py code contry fontpath."
         print "eg : python stock_draw.py AAPL US D:\Dev\stockdb\ipagp.ttf"
         raise SystemExit
 
     symbol = sys.argv[1]
-    contry = sys.argv[2]
-    fontpath = sys.argv[3]
+    contry = 'jp'
+    fontpath = sys.argv[2]
 
     # (Year, month, day) tuples suffice as args for quotes_historical_yahoo
-    date0 = (2016, 1, 1)
-    date1 = (2016, 3, 1)
-    date2 = (2016, 6, 1)
-    start = '2016-01-01'
+    sd = datetime(2017, 4, 1)
+    ed = datetime(2017, 8, 1)
+    start = '2017-02-01'
 
-    quotes = quotes_historical_yahoo_ochl(symbol, date1, date2)
-    if len(quotes) == 0:
+    inst = Stocks()
+
+    #quotes = quotes_historical_yahoo_ochl(symbol, date1, date2)
+    df = inst.price(sd, ed, symbol+'-T', '1d')
+
+    if len(df) == 0:
         raise SystemExit
 
-    ds, opens, closes, highs, lows, volumes = zip(*quotes)
+    opens = df[u'始値']
+    closes = df[u'終値']
+    highs = df[u'高値']
+    lows = df[u'安値']
+    volumes = df[u'出来高']
+
+    #ds, opens, closes, highs, lows, volumes = zip(*quotes)
+
     days = len(closes)
 
     '''
@@ -200,29 +272,20 @@ if __name__ == '__main__':
     stockname = get_stock_name(symbol, contry)
     stockname = symbol + stockname
 
-    if contry=='jp' or contry=='japan':
-        stock_tse = get_quote_yahoojp(symbol, start=start)
-        sma5 = pd.rolling_mean(stock_tse['Adj Close'], window=5)
-        sma5 = sma5.dropna()
-        ewma = pd.stats.moments.ewma
-        ewma5 = ewma(stock_tse['Adj Close'], span=5)
-        ewma25 = ewma(stock_tse['Adj Close'], span=25)
-        ewma25 = ewma25.dropna()
+    stock_tse = get_quote_yahoojp(symbol, start=start)
+    sma5 = pd.rolling_mean(stock_tse['Adj Close'], window=5)
+    sma5 = sma5.dropna()
+    ewma = pd.stats.moments.ewma
+    ewma5 = ewma(stock_tse['Adj Close'], span=5)
+    ewma25 = ewma(stock_tse['Adj Close'], span=25)
+    ewma25 = ewma25.dropna()
 
-        ma5 = np.array(ewma5).astype(float)
-        ma25 = np.array(ewma25).astype(float)
-    else:
-        quotes2 = quotes_historical_yahoo_ochl(symbol, date0, date2)
-        ds2, opens2, closes2, highs2, lows2, volumes2 = zip(*quotes2)
-        ma5 = moving_average(closes2, 5, type='simple')
-        ma25 = moving_average(closes2, 25, type='simple')
+    ma5 = np.array(ewma5).astype(float)
+    ma25 = np.array(ewma25).astype(float)
 
     ma5 = ma5[-days:]
     ma25 = ma25[-days:]
 
-    formatter = IndexDateFormatter(ds, '%Y-%m-%d')
-    millionformatter = FuncFormatter(millions)
-    thousandformatter = FuncFormatter(thousands)
     #fig = plt.figure(figsize=(8, 6))
     #fp = FontProperties(fname=r'D:\Dev\stockdb\ipagp.ttf')
     fp = FontProperties(fname=fontpath)
@@ -251,10 +314,7 @@ if __name__ == '__main__':
         lows[-1], closes[-1],
         volumes[-1]*1e-6,
         closes[-1]-opens[-1])
-    t4 = ax0.text(0.4, top, s, fontsize=textsize,
-               transform=ax0.transAxes)
-    ax0.xaxis_date()
-    ax0.autoscale_view()
+    t5 = ax0.text(0.4, top, s, fontsize=textsize, transform=ax0.transAxes)
 
     ax0.plot(ma5, color='b', lw=2)
     ax0.plot(ma25, color='r', lw=2)
@@ -274,6 +334,11 @@ if __name__ == '__main__':
     vc = volume_overlay(ax1, opens, closes, volumes, colorup='g', alpha=0.5, width=1)
     ax1.add_collection(vc)
 
+    inxval = mdates.date2num(closes.index.to_pydatetime())
+    formatter = IndexDateFormatter(inxval, '%Y-%m-%d')
+    millionformatter = FuncFormatter(millions)
+    thousandformatter = FuncFormatter(thousands)
+
     ax1.xaxis.set_major_locator(get_locator())
     ax1.xaxis.set_major_formatter(formatter)
     ax1.yaxis.set_major_formatter(millionformatter)
@@ -281,7 +346,7 @@ if __name__ == '__main__':
     ax1.set_ylabel(u'出来高', fontproperties = fp, fontsize=16)
 
     plt.setp(ax0.get_xticklabels(), visible=False)
-    plt.setp(ax1.get_xticklabels(), rotation=30, horizontalalignment='left')
+    plt.setp(ax1.get_xticklabels(), rotation=30, horizontalalignment='right')
     plt.legend(prop = fp);
 
     plt.show()
