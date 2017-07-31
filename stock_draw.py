@@ -25,10 +25,9 @@ import numpy as np
 from pandas import Series, DataFrame
 from urllib2 import urlopen
 import urllib2
-#import pandas.io.data as web
 import pandas_datareader._utils as web
 from pykdb.core import Stocks, KDBError
-from datetime import datetime
+import datetime
 import time
 import matplotlib.dates as mdates
 
@@ -216,8 +215,8 @@ if __name__ == '__main__':
     print sys.argv[:]
 
     if len(sys.argv) < 3 :
-        print "Usage : python stock_draw.py code contry fontpath."
-        print "eg : python stock_draw.py AAPL US D:\Dev\stockdb\ipagp.ttf"
+        print "Usage : python stock_draw.py code fontpath."
+        print "eg : python stock_draw.py 6734 D:\Dev\stockdb\ipagp.ttf"
         raise SystemExit
 
     symbol = sys.argv[1]
@@ -225,8 +224,8 @@ if __name__ == '__main__':
     fontpath = sys.argv[2]
 
     # (Year, month, day) tuples suffice as args for quotes_historical_yahoo
-    sd = datetime(2017, 4, 1)
-    ed = datetime(2017, 8, 1)
+    sd = datetime.datetime(2017, 4, 1)
+    ed = datetime.date.today()
     start = '2017-02-01'
 
     inst = Stocks()
