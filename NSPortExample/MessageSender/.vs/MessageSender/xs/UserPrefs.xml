@@ -1,0 +1,27 @@
+﻿<Properties StartupConfiguration="{666A6318-0ED8-4B30-A6D1-62B995122227}|Default">
+  <MonoDevelop.Ide.Workbench ActiveDocument="MessageSender/MainWindowController.cs">
+    <Files>
+      <File FileName="MessageSender/Main.cs" Line="10" Column="1" />
+      <File FileName="MessageSender/MainWindow.cs" Line="17" Column="4" />
+      <File FileName="MessageSender/MainWindowController.cs" Line="88" Column="44" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="MessageSender" expanded="True">
+            <Node name="MessageSender" expanded="True">
+              <Node name="MainMenu.xib" selected="True" />
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MonoDevelop.Ide.ItemProperties.MessageSender PreferredExecutionTarget="Test1" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MultiItemStartupConfigurations />
+</Properties>
